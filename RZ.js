@@ -11,8 +11,11 @@ var authors = "";
 var version = 1;
 var releaseOrder = "6";
 var rho_dot = BigNumber.ZERO;
-var t = BigNumber.ZERO;
-var q, s;
+var T = BigNumber.ZERO;
+var q, s_r, s_i;
+var Z;
+var ZChange = true;
+
 
 var init = () => {
     currency = theory.createCurrency();
@@ -27,16 +30,28 @@ var init = () => {
         q = theory.createUpgrade(0, currency, new FreeCost());
         q.getDescription = (amount) => Utils.getMath(getDesc(q.level));
         q.getInfo = (amount) => Utils.getMathTo(getInfo(q.level), getInfo(q.level + amount));
+        q.bought = (_) => ZChange = true;
     }
 
 
-    // s
+    //s_r
     {
-        let getDesc = (level) => "s=" + getS(level).toString(0);
-        let getInfo = (level) => "s=" + getS(level).toString(0);
-        s = theory.createUpgrade(1, currency, new FreeCost());
-        s.getDescription = (amount) => Utils.getMath(getDesc(s.level));
-        s.getInfo = (amount) => Utils.getMathTo(getInfo(s.level), getInfo(s.level + amount));
+        let getDesc = (level) => "\\sigma =" + getS(level).toString(0);
+        let getInfo = (level) => "\\sigma =" + getS(level).toString(0);
+        s_r = theory.createUpgrade(1, currency, new FreeCost());
+        s_r.getDescription = (amount) => Utils.getMath(getDesc(s_r.level));
+        s_r.getInfo = (amount) => Utils.getMathTo(getInfo(s_r.level), getInfo(s_r.level + amount));
+        s_r.bought = (_) => ZChange = true;
+    }
+
+    // s_i
+    {
+        let getDesc = (level) => "t=" + getS(level).toString(0);
+        let getInfo = (level) => "t=" + getS(level).toString(0);
+        s_i = theory.createUpgrade(2, currency, new FreeCost());
+        s_i.getDescription = (amount) => Utils.getMath(getDesc(s_i.level));
+        s_i.getInfo = (amount) => Utils.getMathTo(getInfo(s_i.level), getInfo(s_i.level + amount));
+        s_i.bought = (_) => ZChange = true;
     }
 
 
@@ -63,10 +78,14 @@ var tick = (elapsedTime, multiplier) => {
     let dt = BigNumber.from(elapsedTime * multiplier);
     let bonus = theory.publicationMultiplier;
 
-    let vz = getZ(getS(s.level));
-    t += dt;
+    if(ZChange){
+        Z = getZ(getS(s_r.level),getS(s_i.level));
+        ZChange = false;
+    }
+    
+    T += dt;
 
-    rho_dot = vz == BigNumber.ONE ? BigNumber.ZERO : BigNumber.ONE/(vz.abs() - BigNumber.ONE);
+    rho_dot = Z == BigNumber.ONE ? BigNumber.ZERO : BigNumber.ONE/(Z.abs() - BigNumber.ONE);
     currency.value += bonus * dt * rho_dot;
 
     theory.invalidateTertiaryEquation();
@@ -95,7 +114,7 @@ var getPrimaryEquation = () => {
 var getSecondaryEquation = () => {
     theory.secondaryEquationHeight = 50;
 
-    let result = "";    
+    let result = "s = \\sigma + it";    
 
     return result
 
@@ -103,11 +122,21 @@ var getSecondaryEquation = () => {
 
 var getTertiaryEquation = () => {
     let result = "\\dot{\\rho} = "+rho_dot;
-    result += "&, \\qquad \\zeta (s) = "+getZ(getS(s.level));
-    result += "&,\\qquad t="+t;
+    result += "&, \\qquad \\zeta (s) = "+Z;
+    result += "&,\\qquad T="+T;
 
     return result
 }
+
+var power1 = (a,b,c) =>{
+    let arg = c*a.log();
+    return a.pow(b)*arg.cos();
+}
+var power2 = (a,b,c) =>{
+    let arg = c*a.log();
+    return a.pow(b)*arg.sin();
+}
+
 
 var getPublicationMultiplier = (tau) => tau.pow(2.203)/200;
 var getPublicationMultiplierFormula = (symbol) => "\\frac{\\tau^{2.203}}{200}";
@@ -115,14 +144,21 @@ var getTau = () => BigNumber.ONE;
 var getCurrencyFromTau = (tau) => [tau.max(BigNumber.ONE).pow(10), currency.symbol];
 var get2DGraphValue = () => currency.value.sign * (BigNumber.ONE + currency.value.abs()).log10().toNumber();
 
-var getQ = (level) => Utils.getStepwisePowerSum(level, 2, 10, 0);
+var getQ = (level) => BigNumber.from(level);
 var getS = (level) => BigNumber.from(level);
-var getZ = (s) => {
-    sum = BigNumber.ZERO;
+var getZ = (s_r,s_i) => {
+    let sum_r = BigNumber.ZERO;
+    let sum_i = BigNumber.ZERO;
+
     for(var i = BigNumber.ONE; i<=q.level; i += BigNumber.ONE){
-        sum += BigNumber.ONE/i.pow(s);
+        tmp_r = power1(i,-s_r,-s_i);
+        tmp_i = power2(i,-s_r,-s_i);
+        log("n is: "+i);
+        log("tmp_r is: "+tmp_r);
+        sum_r += tmp_r;
+        sum_i += tmp_i;
     }
-    return sum;
+    return (sum_r*sum_r+sum_i*sum_i).sqrt();
 }
 
 init();
