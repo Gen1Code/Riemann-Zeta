@@ -85,7 +85,7 @@ var tick = (elapsedTime, multiplier) => {
     
     T += dt;
 
-    rho_dot = Z == BigNumber.ONE ? BigNumber.ZERO : BigNumber.ONE/(Z.abs() - BigNumber.ONE);
+    rho_dot = Z == BigNumber.ONE ? BigNumber.ZERO : BigNumber.ONE/(Z - BigNumber.ONE).abs();
     currency.value += bonus * dt * rho_dot;
 
     theory.invalidateTertiaryEquation();
@@ -104,7 +104,7 @@ var postPublish = () => {
 var getPrimaryEquation = () => {
     theory.primaryEquationHeight = 120;
 
-    let result = "\\dot{\\rho}=\\frac{1}{|\\zeta(s)|-1}";
+    let result = "\\dot{\\rho}= \\left | \\frac{1}{\\left| \\zeta(s) \\right| -1}\\right|";
     result += "\\\\"
     result += "\\zeta (s) = \\sum_{n=1}^{q}\\frac{1}{n^s}"
     
@@ -140,7 +140,7 @@ var power2 = (a,b,c) =>{
 
 var getPublicationMultiplier = (tau) => tau.pow(2.203)/200;
 var getPublicationMultiplierFormula = (symbol) => "\\frac{\\tau^{2.203}}{200}";
-var getTau = () => BigNumber.ONE;
+var getTau = () => currency.value.pow(0.1);
 var getCurrencyFromTau = (tau) => [tau.max(BigNumber.ONE).pow(10), currency.symbol];
 var get2DGraphValue = () => currency.value.sign * (BigNumber.ONE + currency.value.abs()).log10().toNumber();
 
@@ -153,8 +153,6 @@ var getZ = (s_r,s_i) => {
     for(var i = BigNumber.ONE; i<=q.level; i += BigNumber.ONE){
         tmp_r = power1(i,-s_r,-s_i);
         tmp_i = power2(i,-s_r,-s_i);
-        log("n is: "+i);
-        log("tmp_r is: "+tmp_r);
         sum_r += tmp_r;
         sum_i += tmp_i;
     }
